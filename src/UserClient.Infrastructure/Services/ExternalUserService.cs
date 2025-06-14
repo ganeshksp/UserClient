@@ -5,6 +5,8 @@ using System.Net;
 using System.Text.Json;
 using UserClient.Core.Interfaces;
 using UserClient.Core.Models;
+using UserClient.Infrastructure.DTO;
+using UserClient.Infrastructure.ExceptionHandling;
 using UserClient.Infrastructure.Exceptions;
 
 namespace UserClient.Infrastructure.Services;
@@ -67,7 +69,7 @@ public class ExternalUserService : IExternalUserService
         }
         catch (Exception ex)
         {
-            throw MapToProblemDetails(ex, $"/users/{userId}");
+            throw ProblemDetailsMapper.Map(ex, $"/users/{userId}");
         }
     }
 
@@ -112,64 +114,12 @@ public class ExternalUserService : IExternalUserService
 
         catch (Exception ex)
         {
-            throw MapToProblemDetails(ex, "/users");
+            throw ProblemDetailsMapper.Map(ex, "/users");
         }
     }
 
-    private ProblemDetailsException MapToProblemDetails(Exception ex, string? contextPath = null)
-    {
-        switch (ex)
-        {
-            case UserNotFoundException notFound:
-                return notFound;
 
-            case HttpRequestException httpEx:
-                return new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Network error",
-                    Status = 503,
-                    Detail = httpEx.Message,
-                    Instance = contextPath
-                });
+    
 
-            case TaskCanceledException timeoutEx:
-                return new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Request timeout",
-                    Status = 408,
-                    Detail = timeoutEx.Message,
-                    Instance = contextPath
-                });
-
-            case JsonException jsonEx:
-                return new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Invalid response format",
-                    Status = 500,
-                    Detail = jsonEx.Message,
-                    Instance = contextPath
-                });
-
-            default:
-                return new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Unexpected error",
-                    Status = 500,
-                    Detail = ex.Message,
-                    Instance = contextPath
-                });
-        }
-    }
-
-    private class UserWrapper
-    {
-        public User Data { get; set; }
-    }
-
-    private class PaginatedResponse
-    {
-        public int Page { get; set; }
-        public int Total_Pages { get; set; }
-        public List<User> Data { get; set; }
-    }
+    
 }
