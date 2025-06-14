@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UserClient.Core.Models;
+﻿using UserClient.Core.Models;
 
 namespace UserClient.Core.Interfaces
 {

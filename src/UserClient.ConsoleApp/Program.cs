@@ -1,11 +1,10 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using UserClient.Infrastructure;
-using UserClient.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
-using UserClient.Infrastructure.Extensions;
 using UserClient.Core.Interfaces;
+using UserClient.Infrastructure;
+using UserClient.Infrastructure.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration(config =>

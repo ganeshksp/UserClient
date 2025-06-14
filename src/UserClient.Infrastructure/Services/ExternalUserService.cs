@@ -1,10 +1,8 @@
-﻿using System.Net.Http;
-using System.Text.Json;
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using UserClient.Core.Interfaces;
 using UserClient.Core.Models;
-using UserClient.Infrastructure;
 
 namespace UserClient.Infrastructure.Services;
 
