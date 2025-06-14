@@ -1,8 +1,11 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using System.Net;
 using System.Text.Json;
 using UserClient.Core.Interfaces;
 using UserClient.Core.Models;
+using UserClient.Infrastructure.Exceptions;
 
 namespace UserClient.Infrastructure.Services;
 
@@ -41,24 +44,31 @@ public class ExternalUserService : IExternalUserService
         {
             return cachedUser;
         }
-
-        var response = await _httpClient.GetAsync($"{_baseUrl}/users/{userId}").ConfigureAwait(false);
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return null;
-
-        response.EnsureSuccessStatusCode();
-
-        var content = await response.Content.ReadAsStringAsync();
-        var wrapper = JsonSerializer.Deserialize<UserWrapper>(content, _serializerOptions);
-        var user = wrapper?.Data;
-
-        if (user != null)
+        try
         {
-            _cache.Set(cacheKey, user, TimeSpan.FromMinutes(_cacheSettings.UserCacheDurationInMinutes));
-        }
+            var response = await _httpClient.GetAsync($"{_baseUrl}/users/{userId}").ConfigureAwait(false);
 
-        return user;
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new UserNotFoundException(userId, $"/users/{userId}");
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var wrapper = JsonSerializer.Deserialize<UserWrapper>(content, _serializerOptions);
+            var user = wrapper?.Data;
+
+            if (user != null)
+            {
+                _cache.Set(cacheKey, user, TimeSpan.FromMinutes(_cacheSettings.UserCacheDurationInMinutes));
+            }
+            return user;
+        }
+        catch (Exception ex)
+        {
+            throw MapToProblemDetails(ex, $"/users/{userId}");
+        }
     }
 
     /// <summary>
@@ -73,30 +83,82 @@ public class ExternalUserService : IExternalUserService
         {
             return cachedUsers;
         }
-
-        var allUsers = new List<User>();
-        int page = 1;
-
-        while (true)
+        try
         {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/users?page={page}").ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            var allUsers = new List<User>();
+            int page = 1;
 
-            var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<PaginatedResponse>(content, _serializerOptions);
+            while (true)
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/users?page={page}").ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
 
-            if (result?.Data == null || !result.Data.Any())
-                break;
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<PaginatedResponse>(content, _serializerOptions);
 
-            allUsers.AddRange(result.Data);
+                if (result?.Data == null || !result.Data.Any())
+                    break;
 
-            if (page >= result.Total_Pages)
-                break;
+                allUsers.AddRange(result.Data);
 
-            page++;
+                if (page >= result.Total_Pages)
+                    break;
+
+                page++;
+            }
+            _cache.Set(cacheKey, allUsers, TimeSpan.FromMinutes(_cacheSettings.UserCacheDurationInMinutes));
+            return allUsers;
         }
-        _cache.Set(cacheKey, allUsers, TimeSpan.FromMinutes(_cacheSettings.UserCacheDurationInMinutes));
-        return allUsers;
+
+        catch (Exception ex)
+        {
+            throw MapToProblemDetails(ex, "/users");
+        }
+    }
+
+    private ProblemDetailsException MapToProblemDetails(Exception ex, string? contextPath = null)
+    {
+        switch (ex)
+        {
+            case UserNotFoundException notFound:
+                return notFound;
+
+            case HttpRequestException httpEx:
+                return new ProblemDetailsException(new ProblemDetails
+                {
+                    Title = "Network error",
+                    Status = 503,
+                    Detail = httpEx.Message,
+                    Instance = contextPath
+                });
+
+            case TaskCanceledException timeoutEx:
+                return new ProblemDetailsException(new ProblemDetails
+                {
+                    Title = "Request timeout",
+                    Status = 408,
+                    Detail = timeoutEx.Message,
+                    Instance = contextPath
+                });
+
+            case JsonException jsonEx:
+                return new ProblemDetailsException(new ProblemDetails
+                {
+                    Title = "Invalid response format",
+                    Status = 500,
+                    Detail = jsonEx.Message,
+                    Instance = contextPath
+                });
+
+            default:
+                return new ProblemDetailsException(new ProblemDetails
+                {
+                    Title = "Unexpected error",
+                    Status = 500,
+                    Detail = ex.Message,
+                    Instance = contextPath
+                });
+        }
     }
 
     private class UserWrapper
