@@ -9,51 +9,49 @@ namespace UserClient.Infrastructure.ExceptionHandling
     {
         public static ProblemDetailsException Map(Exception ex, string? contextPath = null)
         {
-            return ex switch
+            switch (ex)
             {
-                HttpRequestException httpEx => new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Network error",
-                    Status = 503,
-                    Detail = httpEx.Message,
-                    Instance = contextPath
-                }),
+                case UserNotFoundException notFound:
+                    return notFound;
 
-                TaskCanceledException timeoutEx => new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Request timeout",
-                    Status = 408,
-                    Detail = timeoutEx.Message,
-                    Instance = contextPath
-                }),
+                case HttpRequestException httpEx:
+                    return new ProblemDetailsException(new ProblemDetails
+                    {
+                        Title = "Network error",
+                        Status = 503,
+                        Detail = httpEx.Message,
+                        Instance = contextPath
+                    });
 
-                JsonException jsonEx => new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Invalid response format",
-                    Status = 500,
-                    Detail = jsonEx.Message,
-                    Instance = contextPath
-                }),
+                case TaskCanceledException timeoutEx:
+                    return new ProblemDetailsException(new ProblemDetails
+                    {
+                        Title = "Request timeout",
+                        Status = 408,
+                        Detail = timeoutEx.Message,
+                        Instance = contextPath
+                    });
 
-                _ => new ProblemDetailsException(new ProblemDetails
-                {
-                    Title = "Unexpected error",
-                    Status = 500,
-                    Detail = ex.Message,
-                    Instance = contextPath
-                }),
-            };
+                case JsonException jsonEx:
+                    return new ProblemDetailsException(new ProblemDetails
+                    {
+                        Title = "Invalid response format",
+                        Status = 500,
+                        Detail = jsonEx.Message,
+                        Instance = contextPath
+                    });
+
+                default:
+                    return new ProblemDetailsException(new ProblemDetails
+                    {
+                        Title = "Unexpected error",
+                        Status = 500,
+                        Detail = ex.Message,
+                        Instance = contextPath
+                    });
+            }
         }
 
-        public static ProblemDetailsException CreateUserNotFound(int userId, string instancePath)
-        {
-            return new ProblemDetailsException(new ProblemDetails
-            {
-                Title = "User Not Found",
-                Status = 404,
-                Detail = $"No user found with ID {userId}.",
-                Instance = instancePath
-            });
-        }
+        
     }
 }
